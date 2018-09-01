@@ -1,65 +1,66 @@
-const CHAR_OFFSET = -5;
+const CHAR_OFFSET = -3;
 const LINE_OFFSET = 8;
 const PREV_STATE = 'Backspace';
-const RADIUS_SCALE_FACTOR = 14;
+const RADIUS_SCALE_FACTOR = 5;
 
 const colors = d3.scaleOrdinal(d3.schemeCategory20c);
-let edgeLabels, edgePaths, link, node, simulation, svg;
+let curNodeID = 0, edgeLabels, edgePaths, link, node, simulation, svg;
 
 const graph = {
   nodes: [
     {
       "data": "ε",
+      "curState": true,
       "endState": false,
       "id": 0
     },
-    {
-      "data": "A",
-      "endState": false,
-      "id": 1
-    },
-    {
-      "data": "AB",
-      "endState": false,
-      "id": 2
-    },
-    {
-      "data": "ABC",
-      "endState": true,
-      "id": 3
-    },
+    // {
+    //   "data": "A",
+    //   "endState": false,
+    //   "id": 1
+    // },
+    // {
+    //   "data": "AB",
+    //   "endState": false,
+    //   "id": 2
+    // },
+    // {
+    //   "data": "ABC",
+    //   "endState": true,
+    //   "id": 3
+    // },
   ],
   edges: [
-    {
-      "source": 0,
-      "target": 1,
-      "input": "A",
-    },
-    {
-      "source": 1,
-      "target": 2,
-      "input": "B",
-    },
-    {
-      "source": 2,
-      "target": 3,
-      "input": "C",
-    },
-    {
-      "source": 1,
-      "target": 0,
-      "input": PREV_STATE,
-    },
-    {
-      "source": 2,
-      "target": 1,
-      "input": PREV_STATE,
-    },
-    {
-      "source": 3,
-      "target": 2,
-      "input": PREV_STATE,
-    },
+    // {
+    //   "source": 0,
+    //   "target": 1,
+    //   "input": "A",
+    // },
+    // {
+    //   "source": 1,
+    //   "target": 2,
+    //   "input": "B",
+    // },
+    // {
+    //   "source": 2,
+    //   "target": 3,
+    //   "input": "C",
+    // },
+    // {
+    //   "source": 1,
+    //   "target": 0,
+    //   "input": PREV_STATE,
+    // },
+    // {
+    //   "source": 2,
+    //   "target": 1,
+    //   "input": PREV_STATE,
+    // },
+    // {
+    //   "source": 3,
+    //   "target": 2,
+    //   "input": PREV_STATE,
+    // },
   ]
 }
 
@@ -108,8 +109,6 @@ function update(nodes, links) {
     })
     .style("pointer-events", "none");
 
-  edgePaths = edgePathsEnter.merge(edgePaths);
-
   edgeLabels = svg.selectAll(".edgeLabel")
     .data(links);
 
@@ -132,10 +131,12 @@ function update(nodes, links) {
     .style("text-anchor", "middle")
     .text(d => d.input);
 
-  edgeLabels = edgeLabelsEnter.merge(edgeLabels);
-
   node = svg.selectAll(".node")
     .data(nodes);
+
+  node.selectAll('circle')
+    .classed("highlight", d => d.curState)
+    .classed("endState", d => d.endState);
 
   const nodeEnter = node.enter()
     .append("g")
@@ -147,8 +148,8 @@ function update(nodes, links) {
     );
 
   nodeEnter.append("circle")
-    .attr("r", (d => RADIUS_SCALE_FACTOR*d.data.length))
-    .attr("stroke", d => d.endState ? 'yellow' : null)
+    .attr("r", (d => 5 + RADIUS_SCALE_FACTOR*d.data.length))
+    .classed("highlight", true)
     .style("fill", (d, i) => colors(i));
 
   nodeEnter.append("text")
@@ -159,8 +160,6 @@ function update(nodes, links) {
       'stroke': 'none'
     })
     .text(d => d.data);
-
-  node = nodeEnter.merge(node);
 
   link = svg.selectAll(".link")
     .data(links);
@@ -175,7 +174,10 @@ function update(nodes, links) {
   linkEnter.append("title")
     .text(d => d.input);
 
+  node = nodeEnter.merge(node);
   link = linkEnter.merge(link);
+  edgePaths = edgePathsEnter.merge(edgePaths);
+  edgeLabels = edgeLabelsEnter.merge(edgeLabels);
 
   simulation
     .nodes(nodes)
@@ -218,29 +220,85 @@ function dragended() {
   d3.event.subject.fy = null;
 }
 
+function addChar(keyName) {
+  const toSearch = curNodeID === 0 ? keyName : graph.nodes[curNodeID].data + keyName;
+  const searchRes = _search(toSearch);
+
+  if (searchRes) {
+    setCurState(searchRes);
+  } else {
+    graph.nodes.push({
+        "data": toSearch,
+        "curState": true,
+        "endState": false,
+        "id": graph.nodes.length
+    });
+
+    graph.edges.push({
+      "source": graph.nodes[curNodeID],
+      "target": graph.nodes[graph.nodes.length-1],
+      "input": keyName
+    });
+    graph.edges.push({
+      "source": graph.nodes[graph.nodes.length-1],
+      "target": graph.nodes[curNodeID],
+      "input": PREV_STATE
+    });
+
+    setCurState(graph.nodes.length-1);
+  }
+}
+
+function setCurState(newID) {
+  graph.nodes[curNodeID].curState = false;
+  curNodeID = newID;
+  graph.nodes[curNodeID].curState = true;
+  update(graph.nodes, graph.edges);
+}
+
+function setEndState() {
+  graph.nodes[curNodeID].endState = true;
+  setCurState(0);
+}
+
+function prevState() {
+  if (curNodeID === 0) {
+    return;
+  }
+  const curString = graph.nodes[curNodeID].data;
+  const toSearch = curString.substring(0, curString.length-1);
+
+  setCurState(toSearch ? _search(toSearch) : 0);
+}
+
 const _offset = (input, x) => input === PREV_STATE ? x + LINE_OFFSET : x - LINE_OFFSET;
 
-window.addEventListener("resize", () => {
-  simulation.force("center")
+const _search = (s) => {
+  for (let node of graph.nodes) {
+    if (node.data === s) {
+      return node.id;
+    }
+  }
+  return null;
+}
+
+window.addEventListener('resize', () => {
+  simulation.force('center')
     .x(window.innerWidth / 2)
     .y(window.innerHeight / 2);
 
   simulation.alpha(0.3).restart();
 });
 
-setTimeout(() => {
-  console.log(graph);
-  graph.nodes.push({
-    "data": "ABCD",
-    "endState": false,
-    "id": 4,
-  });
-  graph.edges.push({
-    "source": graph.nodes[3],
-    "target": graph.nodes[4],
-    "input": "D",
-    "index": 6
-  });
-  update(graph.nodes, graph.edges);
+window.addEventListener('keydown', event => {
+  const keyName = event.key;
+  const keyCode = event.keyCode;
 
-}, 2000)
+  if (65 <= keyCode && keyCode <= 90) {
+    addChar(keyName);
+  } else if (keyCode === 13) {
+    setEndState();
+  } else if (keyCode === 8) {
+    prevState();
+  }
+});

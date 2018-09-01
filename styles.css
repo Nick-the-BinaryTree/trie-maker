@@ -8,9 +8,19 @@ svg {
   height: 100vh;
 }
 
+.highlight {
+  stroke: yellow;
+  stroke-width: 2px;
+}
+
+.endState {
+  stroke: black;
+  stroke-width: 2px;
+}
+
 .link {
   stroke: #93ff9c6c;
-  stroke.width: 1px;
+  stroke-width: 1px;
 }
 
 .node {
