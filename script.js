@@ -64,6 +64,10 @@ const graph = {
 }
 
 window.onload = () => {
+  initSim();
+}
+
+function initSim() {
   svg = d3.select("svg"),
 
   svg.append('defs').append('marker')
@@ -83,29 +87,33 @@ window.onload = () => {
     .style('stroke','none');
 
   simulation = d3.forceSimulation()
-    .force("link", d3.forceLink().id(d => d.id).distance(100).strength(1))
-    .force("charge", d3.forceManyBody())
+    .force("link", d3.forceLink().id(d => d.id).distance(200))
+    .force("charge", d3.forceManyBody().strength(-200))
     .force("center", d3.forceCenter(window.innerWidth/2, window.innerHeight/2));
 
-  update(graph.edges, graph.nodes);
+  update(graph.nodes, graph.edges);
 }
 
-function update(links, nodes) {
+function update(nodes, links) {
   edgePaths = svg.selectAll(".edgePath")
     .data(links)
-    .enter()
+
+  const edgePathsEnter = edgePaths.enter()
     .append('path')
     .attrs({
         'class': 'edgePath',
-        'id': function (d, i) {return 'edgePath' + i},
+        'id': (d, i) => 'edgePath' + i,
         'fill-opacity': 0,
         'stroke-opacity': 0
     })
     .style("pointer-events", "none");
 
+  edgePaths = edgePathsEnter.merge(edgePaths);
+
   edgeLabels = svg.selectAll(".edgeLabel")
-    .data(links)
-    .enter()
+    .data(links);
+
+  const edgeLabelsEnter = edgeLabels.enter()
     .append('text')
     .style("pointer-events", "none")
     .attrs({
@@ -115,7 +123,7 @@ function update(links, nodes) {
         'fill': '#aaa'
     });
 
-  edgeLabels.append('textPath')
+  edgeLabelsEnter.append('textPath')
     .attrs({
       'startOffset': "50%",
       'xlink:href': (d, i) => '#edgePath' + i
@@ -124,22 +132,26 @@ function update(links, nodes) {
     .style("text-anchor", "middle")
     .text(d => d.input);
 
+  edgeLabels = edgeLabelsEnter.merge(edgeLabels);
+
   node = svg.selectAll(".node")
-    .data(nodes)
-    .enter()
+    .data(nodes);
+
+  const nodeEnter = node.enter()
     .append("g")
     .attr("class", "node")
     .call(d3.drag()
       .on("start", dragstarted)
       .on("drag", dragged)
+      .on("end", dragended)
     );
 
-  node.append("circle")
+  nodeEnter.append("circle")
     .attr("r", (d => RADIUS_SCALE_FACTOR*d.data.length))
     .attr("stroke", d => d.endState ? 'yellow' : null)
-    .style("fill", (d, i) => colors(i))
+    .style("fill", (d, i) => colors(i));
 
-  node.append("text")
+  nodeEnter.append("text")
     .attrs({
       'dx': d => d.data.length*CHAR_OFFSET,
       'fill': '#000',
@@ -148,17 +160,22 @@ function update(links, nodes) {
     })
     .text(d => d.data);
 
+  node = nodeEnter.merge(node);
+
   link = svg.selectAll(".link")
-    .data(links)
-    .enter()
+    .data(links);
+
+  const linkEnter = link.enter()
     .append("line")
     .attrs({
       'class': 'link',
       'marker-end': 'url(#arrowhead)'
     })
 
-  link.append("title")
+  linkEnter.append("title")
     .text(d => d.input);
+
+  link = linkEnter.merge(link);
 
   simulation
     .nodes(nodes)
@@ -180,19 +197,6 @@ function ticked() {
 
     edgePaths.attr('d', d => 'M ' + _offset(d.input, d.source.x) + ' ' + _offset(d.input, d.source.y)
       + ' L ' + _offset(d.input, d.target.x) + ' ' + _offset(d.input, d.target.y));
-
-    edgeLabels.attr('transform', d => {
-      if (d.target.x < d.source.x) {
-        const bbox = this.getBBox();
-
-        rx = bbox.x + bbox.width / 2;
-        ry = bbox.y + bbox.height / 2;
-        return 'rotate(180 ' + rx + ' ' + ry + ')';
-      }
-      else {
-        return 'rotate(0)';
-      }
-    });
 }
 
 function dragstarted(d) {
@@ -208,6 +212,12 @@ function dragged(d) {
   d.fy = d3.event.y;
 }
 
+function dragended() {
+  if (!d3.event.active) simulation.alphaTarget(0);
+  d3.event.subject.fx = null;
+  d3.event.subject.fy = null;
+}
+
 const _offset = (input, x) => input === PREV_STATE ? x + LINE_OFFSET : x - LINE_OFFSET;
 
 window.addEventListener("resize", () => {
@@ -217,3 +227,20 @@ window.addEventListener("resize", () => {
 
   simulation.alpha(0.3).restart();
 });
+
+setTimeout(() => {
+  console.log(graph);
+  graph.nodes.push({
+    "data": "ABCD",
+    "endState": false,
+    "id": 4,
+  });
+  graph.edges.push({
+    "source": graph.nodes[3],
+    "target": graph.nodes[4],
+    "input": "D",
+    "index": 6
+  });
+  update(graph.nodes, graph.edges);
+
+}, 2000)
