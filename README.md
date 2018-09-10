@@ -1,3 +1,3 @@
-# FSA String Viz
+# Trie Maker
 
-Visualization of finite state automata processing string, minimizing, and checking for graph isomorphism w/ a similar automata.
+Type things! Drag the bubble out of the corner if necessary.
